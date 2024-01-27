@@ -52,4 +52,4 @@ class PandasReplayTicker(BaseTicker):
                     ) for a in self.assets
                 ]
 
-                self.send_tick(ticks)
+                self.send_tick(*ticks)

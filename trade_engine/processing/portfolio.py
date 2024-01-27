@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from django.db import transaction
 
@@ -10,7 +9,7 @@ log = logging.getLogger(__name__)
 
 
 @transaction.atomic()
-def position_roll_forward(ticks: List[Tick]):
+def position_roll_forward(*ticks: Tick):
     for tick in ticks:
         if tick.bid > tick.ask:
             # undocumented feature to catch limit orders from candle stick data, ignore if bid > ask

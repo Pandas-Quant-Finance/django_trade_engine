@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from django.db import transaction
 from django.db.models import Q
@@ -15,7 +14,7 @@ MIN_TRADE_SIZE = 0.01  # would be 1 if we don't allow fractions, currently we tr
 
 # we can provide a backtest order book or a real live order book where we send orders to and receive executed orders
 @transaction.atomic()
-def lala_orderbook(ticks: List[Tick]):
+def lala_orderbook(*ticks: Tick):
     trades = []
     orders = set()
     asset_ticks = {}
@@ -25,7 +24,7 @@ def lala_orderbook(ticks: List[Tick]):
         orders.update(
             models.Order.objects.filter(
                 Q(valid_until__gte=t.tst) | Q(valid_until=None),
-                Q(target_weights__has_key=t.asset) | Q(asset=t.asset) ,
+                Q(target_weights__has_key=t.asset) | Q(asset=t.asset),
                 executed=False,
                 cancelled=False,
                 valid_from__lt=t.tst  # orders strictly placed before the tick arrived.

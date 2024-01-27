@@ -62,6 +62,10 @@ class TestTickOrderExecution(TestCase):
         pd.testing.assert_series_equal(weights[("aapl", "-")].round(decimals=2), pd.Series([None, 0.02, 0.5, 0.7, 1.0, 1.0], index=weights.index), check_names=False)
         pd.testing.assert_series_equal(weights[("msft", "-")].round(decimals=2), pd.Series([None, None, 0.5, 0.3, 0.0, 0.0], index=weights.index), check_names=False)
 
+    def test_target_weights_with_shorts(self):
+        # TODO add a test with shorts
+        pass
+
     @parameterized.expand([
         ('CLOSE', 0, 10),
         ('QUANTITY', 10, 10),
@@ -69,7 +73,6 @@ class TestTickOrderExecution(TestCase):
         ('TARGET_QUANTITY', 5, -5),
         ('TARGET_QUANTITY', 15, 5),
         ('PERCENT', 0.5, 100_000 * 0.5 / df[('aapl', 'Open')].iloc[2]),
-        #('TARGET_WEIGHT', 0.5, ),
     ])
     def test_order_types(self, order_type, quantity, expected_quantity):
 
@@ -89,6 +92,6 @@ class TestTickOrderExecution(TestCase):
         OrderFactory.create(strategy=s, asset='aapl', order_type=order_type, valid_from=df.index[1], valid_until=df.index[-2], quantity=quantity)
         PandasReplayTicker(df).start()
 
-    def test_order_limits(self):
-        df = SAMPLE_DATA.tail()
-        df.to_csv("debugging.csv")
+#    def test_order_limits(self):
+#        df = SAMPLE_DATA.tail()
+#        df.to_csv("debugging.csv")
