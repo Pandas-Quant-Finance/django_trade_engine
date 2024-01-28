@@ -15,8 +15,8 @@ class TestTickPosition(TestCase):
         def update_portfolio_after_tick(sender, signal, ticks):
             print(sender, ticks)
 
-        PositionFactory.create(tstamp=SAMPLE_DATA.index[0], asset='aapl')
-        PandasReplayTicker(SAMPLE_DATA.tail()).start()
+        pos = PositionFactory.create(tstamp=SAMPLE_DATA.index[0], asset='aapl')
+        PandasReplayTicker(SAMPLE_DATA.tail()).start(pos.strategy.pk)
         print(list(Position.objects.all()))
 
         self.assertEqual(len(list(Position.objects.all())), 5 + 1 + 1)

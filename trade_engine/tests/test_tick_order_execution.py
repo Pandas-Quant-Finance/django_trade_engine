@@ -22,32 +22,40 @@ class TestTickOrderExecution(TestCase):
         PositionFactory.create(strategy=s, tstamp=df.index[0], asset='aapl', quantity=10)
         print(models.Portfolio(s).positions)
 
-        OrderFactory.create(
-            strategy=s,
-            order_type='TARGET_WEIGHT',
-            valid_from=df.index[0],
-            target_weights={'aapl': 0.5, 'msft': 0.5},
-        )
+        for asset in ['aapl', 'msft']:
+            OrderFactory.create(
+                strategy=s,
+                order_type='TARGET_WEIGHT',
+                valid_from=df.index[0],
+                asset=asset,
+                quantity=0.5,
+                target_weight_bracket_id='a',
+            )
 
-        OrderFactory.create(
-            strategy=s,
-            order_type='TARGET_WEIGHT',
-            valid_from=df.index[1],
-            target_weights={'aapl': 0.7, 'msft': 0.3},
-        )
+        for asset, weight in [('aapl', 0.7), ('msft', 0.3)]:
+            OrderFactory.create(
+                strategy=s,
+                order_type='TARGET_WEIGHT',
+                valid_from=df.index[1],
+                asset=asset,
+                quantity=weight,
+                target_weight_bracket_id='b',
+            )
 
         OrderFactory.create(
             strategy=s,
             order_type='TARGET_WEIGHT',
             valid_from=df.index[2],
-            target_weights={'aapl': 1.0},
+            asset='aapl',
+            quantity=1.0,
+            target_weight_bracket_id='c',
         )
 
         print(models.Order.objects.first())
 
         # place orders here
         # change target weights OrderFactory.create(strategy=s, order_type='TARGET_WEIGHT', valid_from=df.index[1], target_weights={''})
-        PandasReplayTicker(df).start()
+        PandasReplayTicker(df).start(s.pk)
         print(models.Portfolio(s).positions)
         print(models.Position.objects.all())
 
@@ -67,7 +75,7 @@ class TestTickOrderExecution(TestCase):
         pass
 
     @parameterized.expand([
-        ('CLOSE', 0, 10),
+        ('CLOSE', 0, -10),
         ('QUANTITY', 10, 10),
         ('QUANTITY', -10, -10),
         ('TARGET_QUANTITY', 5, -5),
@@ -90,7 +98,7 @@ class TestTickOrderExecution(TestCase):
 
         # place orders here
         OrderFactory.create(strategy=s, asset='aapl', order_type=order_type, valid_from=df.index[1], valid_until=df.index[-2], quantity=quantity)
-        PandasReplayTicker(df).start()
+        PandasReplayTicker(df).start(s.pk)
 
 #    def test_order_limits(self):
 #        df = SAMPLE_DATA.tail()

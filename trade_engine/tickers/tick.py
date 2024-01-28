@@ -5,6 +5,7 @@ from datetime import datetime
 @dataclass
 class Tick:
 
+    strategy_id: str
     asset: str
     tst: datetime
     bid: float = None

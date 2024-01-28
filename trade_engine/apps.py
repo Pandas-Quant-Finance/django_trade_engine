@@ -25,9 +25,10 @@ def update_positions_after_tick(sender, signal, ticks: List[Tick], **kwargs):
 
 @receiver(position_updated)
 def process_order_book(sender,  signal, ticks: List[Tick], **kwargs):
-    from .processing.orderbook import lala_orderbook
+    from .processing.orderbook import new_orderbook
 
-    lala_orderbook(*ticks)
+    #lala_orderbook(*ticks)
+    new_orderbook(*ticks)
 
 
 @receiver(trade_executed)
