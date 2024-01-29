@@ -8,6 +8,7 @@ from django.forms import model_to_dict
 
 from django.db import models
 from django.db.models import CheckConstraint
+from pytz import UTC
 
 CASH_ASSET = '$$$'
 DEFAULT_ASSET_STRATEGY = '-'
@@ -118,7 +119,7 @@ class Order(models.Model):
     asset_strategy = models.CharField(max_length=64, default=DEFAULT_ASSET_STRATEGY)
     order_type = models.CharField(max_length=20, choices=ORDER_TYPES)
     valid_from = models.DateTimeField()
-    valid_until = models.DateTimeField(default='9999-12-31', blank=True)
+    valid_until = models.DateTimeField(default=datetime.fromisoformat('9999-12-31').astimezone(UTC), blank=True)
     quantity = models.FloatField(null=True, blank=True)
     limit = models.FloatField(null=True, blank=True)
     stop_limit = models.FloatField(null=True, blank=True)
@@ -126,6 +127,7 @@ class Order(models.Model):
     target_weight_bracket_id = models.CharField(max_length=64, default=uuid.uuid4, blank=True)
     executed = models.BooleanField(default=False)
     cancelled = models.BooleanField(default=False)
+    generated = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{model_to_dict(self)}'

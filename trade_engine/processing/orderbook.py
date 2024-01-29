@@ -14,7 +14,7 @@ from ..tickers.tick import Tick
 
 log = logging.getLogger(__name__)
 
-MIN_TRADE_SIZE = 0.01  # would be 1 if we don't allow fractions, currently we treat everything as fractionable
+MIN_TRADE_SIZE = 0.01  # only trade if we reach 1cent trade equivalent, should be configured per orderbook
 
 # we need to eventually make this a temp table of a in-memory database
 LATEST_TICKS = defaultdict(dict)
@@ -159,6 +159,8 @@ def new_orderbook(*ticks: Tick, stop_propagation: bool = False):
     tradeable_orders = check_limits(tradeable_orders)
 
     trades = make_trades(tradeable_orders)
+    trades = filter_minium_trade_volume(trades)
+
     if len(trades) > 0 and not stop_propagation:
         trade_executed.send(sender=models.Order.__class__, trades=trades)
 
@@ -221,31 +223,33 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
 
     elif order.order_type == 'TARGET_WEIGHT':
         # get all orders from the same target_weight_bracket_id
-        target_weight_orders = {o.asset: o.quantity for o in [order, *bracket_orders]}
+        target_weight_orders = {o.asset: o for o in [order, *bracket_orders]}
 
         # get the portfolio
         portfolio_value, positions = models.Portfolio(order.strategy).positions
 
-        # calculate delta weights
-        delta_weights = {a: w - positions[a].weight if a in positions else w for a, w in target_weight_orders.items() if a != models.CASH_ASSET}
-
         # keys in the portfolio but not in the target weighs need to be closed
         for a, pos in positions.items():
             if a not in target_weight_orders and a != models.CASH_ASSET:
-                delta_weights[a] = -pos.weight
+                target_weight_orders[a] = models.Order(
+                    strategy=order.strategy, asset=a, asset_strategy=order.asset_strategy, order_type='TARGET_WEIGHT',
+                    valid_from=order.valid_from, valid_until=order.valid_from, quantity=0, generated=True,
+                )
 
         # calculate quantities
-        for a, dw in delta_weights.items():
+        for a, o in target_weight_orders.items():
             tick = LATEST_TICKS[order.strategy_id].get(a, None)
             if tick is None:
                 log.warning(f"No price available for: {a}, skip order: {order}")
                 continue
 
-            price = tick.ask if dw > 0 else tick.bid
+            # use calculate quantity of order
+            price = (tick.ask + tick.bid) / 2
+            qty = (portfolio_value * o.quantity) / price
+            if a in positions:
+                qty -= positions[a].quantity
 
-            # use delta weights for quantity and append all trades. continue (skip limit check) afterward
-            qty = (portfolio_value * dw) / price
-            yield qty, tick, order
+            yield qty, tick, target_weight_orders[a]
     else:
         yield order.quantity, LATEST_TICKS[order.strategy.pk][order.asset], order
 
@@ -253,11 +257,15 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
 def check_limits(orders: Iterable[Tuple[float, Tick, Order]]) -> List[Tuple[float, float, Tick, Order]]:
     # check limit if limit order using most recent tick, eventually update the price
     # TODO implement limit checks ...
-    return [(o[0], o[0], *o[1:]) for o in orders]
+    return [(o[0], o[1].ask if o[0] > 0 else o[1].bid, *o[1:]) for o in orders]
 
 
 def make_trades(orders: Iterable[Tuple[float, float, Tick, Order]]) -> List[models.Trade]:
     return [models.Trade(o.strategy, t.tst, o.asset, q, p, order=o.pk) for q, p, t, o in orders]
+
+
+def filter_minium_trade_volume(trades: List[models.Trade]) -> List[models.Trade]:
+    return list(filter(lambda t: abs(t.quantity * t.price) >= MIN_TRADE_SIZE, trades))
 
 
 def mark_orders_executed(orders: Iterable[Tuple[float, float, Tick, Order]]):
