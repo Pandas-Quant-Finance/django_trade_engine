@@ -28,12 +28,14 @@ class TestTickOrderExecution(TestCase):
         ('QUANTITY', ['FOO'], 3, 3),
         ('TARGET_QUANTITY', ['BAR'], 40007, 7.0),
         ('PERCENT', ['FOO'], 0.5, 100_000 * 0.5 / 10),
+        ('INCREASE_PERCENT', ['BAR'], 0.5, 60000 * 0.5),
     ])
     def test_order_types(self, order_type, assets, quantity, expected_quantity):
 
         @receiver(trade_executed)
         def update_portfolio_after_trade(sender, signal, trades: List[models.Trade], **kwargs):
             print(trades)
+            self.assertIn(trades[0].asset, assets)
             self.assertEqual(1, len(trades))
             self.assertEqual(trades[0].quantity, expected_quantity)
 

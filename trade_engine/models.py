@@ -111,6 +111,7 @@ class Order(models.Model):
         ('QUANTITY', 'QUANTITY'),
         ('TARGET_QUANTITY', 'TARGET_QUANTITY'),
         ('PERCENT', 'PERCENT'),
+        ('INCREASE_PERCENT', 'INCREASE_PERCENT'),
         ('TARGET_WEIGHT', 'TARGET_WEIGHT'),
     ]
 

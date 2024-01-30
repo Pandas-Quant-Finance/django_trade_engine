@@ -19,6 +19,7 @@ class TestTickOrderExecution(TestCase):
 
     def test_target_weight(self):
         s = StrategyFactory.create()
+        #PositionFactory.create(strategy=s, tstamp=df.index[0], asset='aapl', asset_strategy='different animal', quantity=11)
         PositionFactory.create(strategy=s, tstamp=df.index[0], asset='aapl', quantity=10)
         print(models.Portfolio(s).positions)
 

@@ -33,14 +33,14 @@ def new_orderbook(*ticks: Tick, stop_propagation: bool = False):
 
     # convert orders to executable trades
     trades = make_trades(tradeable_orders)
-    trades = filter_minium_trade_volume(trades)
+    trades, orders = filter_minium_trade_volume(trades)
 
     # execute trades
     if len(trades) > 0 and not stop_propagation:
         trade_executed.send(sender=models.Order.__class__, trades=trades)
 
     # mark orders executed
-    mark_orders_executed(tradeable_orders)
+    mark_orders_executed(orders)
 
 
 def aggregate_ticks(ticks: Iterable[Tick]) -> Dict[str, Tick]:
@@ -79,30 +79,40 @@ def get_orders_with_quantity(orders: Dict[str, Dict[str, Set[models.Order]]]) ->
 def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order) -> Tuple[float, float, models.Order] | List[Tuple[float, Tick, models.Order]]:
     # TODO we need the most recent tick for each asset which is not a high/low tick and return (quantity, price, order)
 
-    if order.order_type == 'CLOSE':
-        pos = models.Position.objects.filter(
+    def get_postion_for_order(order):
+        return models.Position.objects.filter(
             strategy=order.strategy, asset=order.asset, asset_strategy=order.asset_strategy
         ).first()
 
+    if order.order_type == 'CLOSE':
+        pos = get_postion_for_order(order)
         yield (0 if pos is None else -pos.quantity), LATEST_TICKS[order.strategy.pk][order.asset], order
     elif order.order_type == 'TARGET_QUANTITY':
-        pos = models.Position.objects.filter(
-            strategy=order.strategy, asset=order.asset, asset_strategy=order.asset_strategy
-        ).first()
-
+        pos = get_postion_for_order(order)
         yield (0 if pos is None else (order.quantity - pos.quantity)), LATEST_TICKS[order.strategy.pk][order.asset], order
     elif order.order_type == 'PERCENT':
         cash = models.Position.objects.filter(strategy=order.strategy, asset=models.CASH_ASSET).first()
         latest_tick = LATEST_TICKS[order.strategy.pk][order.asset]
-        quantity = (order.quantity * cash.value) / (latest_tick.ask if order.quantity > 0 else latest_tick.bid)
-        yield (0 if cash.value < 0 or quantity < MIN_TRADE_SIZE else quantity), latest_tick, order
 
+        if order.quantity < 0 and (pos := get_postion_for_order(order)) is not None:
+            # if percent is < 0 and we have a position, we want to decrease the position
+            quantity = ((1 + order.quantity) * pos.value) / (latest_tick.ask if pos.quantity > 0 else latest_tick.bid)
+        else:
+            quantity = (order.quantity * cash.value) / (latest_tick.ask if order.quantity > 0 else latest_tick.bid)
+
+        yield (0 if cash.value < 0 or quantity < MIN_TRADE_SIZE else quantity), latest_tick, order
+    elif order.order_type == 'INCREASE_PERCENT':
+        latest_tick = LATEST_TICKS[order.strategy.pk][order.asset]
+        pos = get_postion_for_order(order)
+        quantity = ((1 + order.quantity) * pos.value) / (latest_tick.ask if order.quantity > 0 else latest_tick.bid)
+        yield quantity, latest_tick, order
     elif order.order_type == 'TARGET_WEIGHT':
         # get all orders from the same target_weight_bracket_id
         target_weight_orders = {o.asset: o for o in [order, *bracket_orders]}
 
         # get the portfolio
         portfolio_value, positions = models.Portfolio(order.strategy).positions
+        positions = {a: p for a, p in positions.items() if p.asset_strategy == order.asset_strategy}
 
         # keys in the portfolio but not in the target weighs need to be closed
         for a, pos in positions.items():
@@ -136,16 +146,25 @@ def check_limits(orders: Iterable[Tuple[float, Tick, Order]]) -> List[Tuple[floa
     return [(o[0], o[1].ask if o[0] > 0 else o[1].bid, *o[1:]) for o in orders]
 
 
-def make_trades(orders: Iterable[Tuple[float, float, Tick, Order]]) -> List[models.Trade]:
-    return [models.Trade(o.strategy, t.tst, o.asset, q, p, order=o.pk) for q, p, t, o in orders]
+def make_trades(orders: Iterable[Tuple[float, float, Tick, Order]]) -> List[Tuple[models.Trade, models.Order]]:
+    return [(models.Trade(o.strategy, t.tst, o.asset, q, p, order=o.pk), o) for q, p, t, o in orders]
 
 
-def filter_minium_trade_volume(trades: List[models.Trade]) -> List[models.Trade]:
-    return list(filter(lambda t: abs(t.quantity * t.price) >= MIN_TRADE_SIZE, trades))
+def filter_minium_trade_volume(trades: List[Tuple[models.Trade, models.Order]]) -> Tuple[List[models.Trade], List[models.Order]]:
+    executeable_trades = []
+    orders = []
+
+    for t, o in trades:
+        if abs(t.quantity * t.price) >= MIN_TRADE_SIZE and abs(t.quantity) > 0:
+            executeable_trades.append(t)
+        else:
+            o.cancelled = True
+
+        orders.append(o)
+    return executeable_trades, orders
 
 
 def mark_orders_executed(orders: Iterable[Tuple[float, float, Tick, Order]]):
-    for q, _, _, order in orders:
+    for order in orders:
         order.executed = True
-        if q == 0: order.cancelled = True
         order.save()
