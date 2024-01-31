@@ -12,6 +12,9 @@ from pytz import UTC
 
 CASH_ASSET = '$$$'
 DEFAULT_ASSET_STRATEGY = '-'
+DEFAULT_BRACKET_FACTORY = uuid.uuid4
+DEFAULT_MAX_DATE = datetime.fromisoformat('9999-12-31').astimezone(UTC)
+DEFAULT_MIN_DATE = datetime.fromisoformat('0001-01-01T00:00:00+00:00').astimezone(UTC)
 
 
 class Strategy(models.Model):
@@ -26,7 +29,7 @@ class Strategy(models.Model):
         if is_new:
             Position.objects.create(
                 strategy=self,
-                tstamp='0001-01-01 00:00:00',
+                tstamp=DEFAULT_MIN_DATE,
                 asset=CASH_ASSET,
                 asset_strategy='cash',
                 quantity=self.start_capital,
@@ -120,12 +123,12 @@ class Order(models.Model):
     asset_strategy = models.CharField(max_length=64, default=DEFAULT_ASSET_STRATEGY)
     order_type = models.CharField(max_length=20, choices=ORDER_TYPES)
     valid_from = models.DateTimeField()
-    valid_until = models.DateTimeField(default=datetime.fromisoformat('9999-12-31').astimezone(UTC), blank=True)
+    valid_until = models.DateTimeField(default=DEFAULT_MAX_DATE, blank=True)
     quantity = models.FloatField(null=True, blank=True)
     limit = models.FloatField(null=True, blank=True)
     stop_limit = models.FloatField(null=True, blank=True)
     stop_limit_activated = models.BooleanField(default=False)
-    target_weight_bracket_id = models.CharField(max_length=64, default=uuid.uuid4, blank=True)
+    target_weight_bracket_id = models.CharField(max_length=64, default=DEFAULT_BRACKET_FACTORY, blank=True)
     executed = models.BooleanField(default=False)
     cancelled = models.BooleanField(default=False)
     generated = models.BooleanField(default=False)
@@ -178,11 +181,11 @@ class Portfolio(object):
             p.asset: p for p in positions
         }
 
-    def position_history(self):
+    def position_history(self, from_index: datetime = DEFAULT_MIN_DATE):
         queries = []
         positions = pd.DataFrame(
             model_to_dict(p) for p in Position.objects\
-                .filter(*queries, strategy=self.strategy)\
+                .filter(*queries, strategy=self.strategy, tstamp__gte=from_index)\
                 .order_by("strategy", "asset", "asset_strategy", "tstamp")\
                 .all()
         )

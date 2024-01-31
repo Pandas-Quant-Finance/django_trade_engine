@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Callable
 
 import pandas as pd
 import pytz
@@ -20,7 +20,7 @@ class PandasReplayTicker(BaseTicker):
             slippage_std: float = 0.0,
             slippage_fixed: float = 0.0,
             # sequence of prices, note: High > Low because we want to catch all limit orders
-            prices: List[Tuple[str, str]] = (('Open', 'Open'), ('Close', 'Close'), ('High', 'Low')),
+            prices: List[Tuple[str, str]] = (('Open', 'Open'), ('High', 'Low'), ('Close', 'Close')),
             volume=None,
      ):
         if isinstance(df, dict): df = pd.concat(df.values(), axis=1, keys=df.keys())
@@ -34,13 +34,13 @@ class PandasReplayTicker(BaseTicker):
     def send_tick(self, *ticks: Tick):
         tick.send(sender=self.__class__, ticks=ticks)
 
-    def start(self, strategy_id: str):
+    def start(self, strategy_id: str, callback: Callable[[List[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] = None):
         for date in self.index:
             if isinstance(date, pd.Timestamp):
                 date = date.to_pydatetime()
 
             # bid/ask = open -/+ slippage volumne = volume
-
+            ticks = []
             for p in self.prices:
                 ticks = [
                     Tick(
@@ -54,3 +54,6 @@ class PandasReplayTicker(BaseTicker):
                 ]
 
                 self.send_tick(*ticks)
+
+            if callable(callback):
+                callback(ticks, self.df.loc[:date])

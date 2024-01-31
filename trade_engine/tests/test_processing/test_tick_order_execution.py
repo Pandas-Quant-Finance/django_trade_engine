@@ -12,8 +12,6 @@ from trade_engine import models
 
 df = SAMPLE_DATA.tail()
 
-# FIXME high low sonder tick muss vor dem close kommen, darf im orderbook aber nur bei der Limit Prüfung verwendet werden
-
 
 class TestTickOrderExecution(TestCase):
 
