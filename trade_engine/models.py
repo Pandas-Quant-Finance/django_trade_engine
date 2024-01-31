@@ -71,7 +71,7 @@ class Position(models.Model):
             strategy = [str(s.pk if isinstance(s, Strategy) else s) for s in strategy]
 
         def get_filter(ns=''):
-            filter = ""
+            filter = f""
 
             if strategy is not None:
                 filter += f" and {ns}strategy_id in ({','.join(strategy)})"

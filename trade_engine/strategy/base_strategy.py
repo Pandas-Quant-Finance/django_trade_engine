@@ -22,7 +22,7 @@ class StrategyBase(object):
         self.strategy_id = self.strategy.pk
 
     def run(self, ticker: BaseTicker):
-        # create strategy (what if already exists?)
+        # NOTE in case of a "realtime streaming" ticker, this method might never return!
 
         # init
         self.on_init(self.strategy)

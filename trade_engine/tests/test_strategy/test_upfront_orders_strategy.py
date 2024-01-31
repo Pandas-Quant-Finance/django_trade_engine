@@ -1,6 +1,7 @@
 import pandas as pd
 from django.dispatch import receiver
-from django.test import TestCase
+from django.test import TestCase, SimpleTestCase
+#from unittest import TestCase  # uses the "prod" database
 from parameterized import parameterized
 
 from trade_engine.signals import trade_executed
@@ -15,26 +16,29 @@ from trade_engine import models
 df = SAMPLE_DATA["aapl"]
 
 
-class TestUpfrontOrderStrategy(TestCase):
+class TestUpfrontOrderStrategy(SimpleTestCase):
+    databases = ["default"]
 
     # TODO make the same test where we pass the rolling means as features into a streaming strategy
     def test_sma_strategy(self):
-        # calculate sma
+        # calculate signals
         fast = df["Close"].rolling(20).mean()
         slow = df["Close"].rolling(60).mean()
         signal = fast > slow
         buy = (signal) & (~signal).shift(-1)
         sell = (~signal) & (signal).shift(-1)
 
+        # create orders from signals
         buys = buy.apply(lambda signal: Order(asset='aapl', order_type='PERCENT', quantity=1.0) if signal else None)
         sells = sell.apply(lambda signal: Order(asset='aapl', order_type='CLOSE') if signal else None)
 
-        # create orders # TODO provide order factory from the strategy object
+        # create strategy
         strategy = UpfrontOrdersStrategy(
             strategy_name='test_strategy',
             orders=buys.combine_first(sells),
         )
 
+        # backtest strategy
         strategy.run(PandasReplayTicker({"aapl": df}))
         print(models.Portfolio(strategy.strategy).position_history())
 

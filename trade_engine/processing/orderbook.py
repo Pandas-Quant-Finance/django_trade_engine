@@ -80,9 +80,11 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
     # TODO we need the most recent tick for each asset which is not a high/low tick and return (quantity, price, order)
 
     def get_postion_for_order(order):
-        return models.Position.objects.filter(
-            strategy=order.strategy, asset=order.asset, asset_strategy=order.asset_strategy
-        ).first()
+        return (
+            [p for p in models.Position.fetch_most_recent_positions(strategy=order.strategy, asset=order.asset, include_zero=True) if p.asset_strategy == order.asset_strategy]
+            or
+            [None]
+        )[0]
 
     if order.order_type == 'CLOSE':
         pos = get_postion_for_order(order)
