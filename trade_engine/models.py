@@ -1,13 +1,11 @@
 import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, List, Dict, Tuple
 
 import pandas as pd
-from django.forms import model_to_dict
-
 from django.db import models
 from django.db.models import CheckConstraint
+from django.forms import model_to_dict
 from pytz import UTC
 
 CASH_ASSET = '$$$'
@@ -22,6 +20,7 @@ class Strategy(models.Model):
     name = models.CharField(max_length=512)
     start_capital = models.FloatField(default=100_000)
     train_until = models.DateTimeField(default=DEFAULT_MAX_DATE)
+    hyper_parameters = models.JSONField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -39,6 +38,17 @@ class Strategy(models.Model):
 
     def __str__(self):
         return f'{model_to_dict(self)}'
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['name'], name='unique_strategy'),
+        ]
+
+
+class Epoch(models.Model):
+
+    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
+    epoch = models.IntegerField(default=0)
 
 
 class Position(models.Model):
@@ -102,7 +112,7 @@ class Position(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['strategy', 'asset', 'asset_strategy', 'tstamp'], name='unique_asset'),
+            models.UniqueConstraint(fields=['strategy', 'asset', 'asset_strategy', 'tstamp'], name='unique_asset_position'),
         ]
         indexes = [
             # models.Index(fields=['strategy', 'asset', 'asset_strategy', 'tstamp']),  # is already a constraint

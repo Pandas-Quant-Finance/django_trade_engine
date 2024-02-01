@@ -24,8 +24,13 @@ class StrategyBase(object):
     def run(self, ticker: BaseTicker):
         # NOTE in case of a "realtime streaming" ticker, this method might never return!
 
+        # TODO we should create the strategy here, we might introduce versioning here and an option to delete
+        #  an eventually already existing strategy
+
         # init
         self.on_init(self.strategy)
+
+        # TODO we introduce a new "Epoch" object where we loop trough
 
         # start backtest ticker
         if handler := self.on_end_of_bar_event_handler():
