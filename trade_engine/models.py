@@ -21,6 +21,7 @@ class Strategy(models.Model):
 
     name = models.CharField(max_length=512)
     start_capital = models.FloatField(default=100_000)
+    train_until = models.DateTimeField(default=DEFAULT_MAX_DATE)
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -101,10 +102,12 @@ class Position(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['strategy', 'tstamp', 'asset', 'asset_strategy'], name='unique_asset'),
+            models.UniqueConstraint(fields=['strategy', 'asset', 'asset_strategy', 'tstamp'], name='unique_asset'),
         ]
         indexes = [
-            models.Index(fields=['asset', 'tstamp'])
+            # models.Index(fields=['strategy', 'asset', 'asset_strategy', 'tstamp']),  # is already a constraint
+            models.Index(fields=['strategy', 'asset', 'tstamp']),
+            models.Index(fields=['strategy', 'asset']),
         ]
 
 
