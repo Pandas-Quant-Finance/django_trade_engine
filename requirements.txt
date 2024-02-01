@@ -2,7 +2,7 @@ django
 django-db-views
 djangorestframework
 pandas
-
+plotly
 
 
 

@@ -127,6 +127,7 @@ class Order(models.Model):
         ('CLOSE', 'CLOSE'),
         ('QUANTITY', 'QUANTITY'),
         ('TARGET_QUANTITY', 'TARGET_QUANTITY'),
+        # TODO add 'VALUE' and 'TARGET_VALUE' order types
         ('PERCENT', 'PERCENT'),
         ('INCREASE_PERCENT', 'INCREASE_PERCENT'),
         ('TARGET_WEIGHT', 'TARGET_WEIGHT'),
