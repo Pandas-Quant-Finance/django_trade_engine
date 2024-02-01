@@ -28,10 +28,10 @@ def position_roll_forward(*ticks: Tick):
 @transaction.atomic()
 def position_update(*trades: models.Trade):
     log.info(f"execute trades: {trades}")
-    strategies = {trade.strategy for trade in trades}
-    positions = {(pos.strategy, pos.asset, pos.asset_strategy): pos for pos in models.Position.fetch_most_recent_positions(strategy=strategies)}
-    cash = {t.strategy: models.Position.fetch_most_recent_cash(t.strategy) for t in trades}
-    cash_updates = {t.strategy: 0 for t in trades}
+    epochs = {trade.epoch_id for trade in trades}
+    positions = {(pos.epoch, pos.asset, pos.asset_strategy): pos for pos in models.Position.fetch_most_recent_positions(epochs)}
+    cash = {t.epoch: models.Position.fetch_most_recent_cash(t.epoch) for t in trades}
+    cash_updates = {t.epoch: 0 for t in trades}
     max_tsts = {}
 
     for trade in trades:
@@ -40,10 +40,10 @@ def position_update(*trades: models.Trade):
             continue
 
         # when a trade has executed we need to create or increase / decrease positions
-        if (trade.strategy, trade.asset, trade.asset_strategy) not in positions:
+        if (trade.epoch, trade.asset, trade.asset_strategy) not in positions:
             # create
             models.Position(
-                strategy=trade.strategy,
+                epoch=trade.epoch,
                 tstamp=trade.tstamp,
                 asset=trade.asset,
                 asset_strategy=trade.asset_strategy,
@@ -52,14 +52,14 @@ def position_update(*trades: models.Trade):
             ).save()
         else:
             # update current position
-            pos = positions[(trade.strategy, trade.asset, trade.asset_strategy)]
+            pos = positions[(trade.epoch, trade.asset, trade.asset_strategy)]
             pos.tstamp = trade.tstamp
             pos.quantity += trade.quantity
             pos.last_price = trade.price
             pos.save()
 
-        cash_updates[trade.strategy] += (trade.quantity * trade.price)
-        max_tsts[trade.strategy] = max(max_tsts.get(trade.strategy, trade.tstamp), trade.tstamp)
+        cash_updates[trade.epoch] += (trade.quantity * trade.price)
+        max_tsts[trade.epoch] = max(max_tsts.get(trade.epoch, trade.tstamp), trade.tstamp)
 
     # update all cash positions as well
     for strategy, amount in cash_updates.items():

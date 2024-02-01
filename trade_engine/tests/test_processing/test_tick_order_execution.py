@@ -5,7 +5,7 @@ from parameterized import parameterized
 
 from trade_engine.signals import trade_executed
 from trade_engine.tests.data import SAMPLE_DATA
-from trade_engine.tests.factories.simple import OrderFactory, PositionFactory, StrategyFactory
+from trade_engine.tests.factories.simple import OrderFactory, PositionFactory, EpochFactory
 from trade_engine.tickers.replayticker import PandasReplayTicker
 from trade_engine import models
 
@@ -16,14 +16,14 @@ df = SAMPLE_DATA.tail()
 class TestTickOrderExecution(TestCase):
 
     def test_target_weight(self):
-        s = StrategyFactory.create()
+        e = EpochFactory.create()
         #PositionFactory.create(strategy=s, tstamp=df.index[0], asset='aapl', asset_strategy='different animal', quantity=11)
-        PositionFactory.create(strategy=s, tstamp=df.index[0], asset='aapl', quantity=10)
-        print(models.Portfolio(s).positions)
+        PositionFactory.create(epoch=e, tstamp=df.index[0], asset='aapl', quantity=10)
+        print(models.Portfolio(e).positions)
 
         for asset in ['aapl', 'msft']:
             OrderFactory.create(
-                strategy=s,
+                epoch=e,
                 order_type='TARGET_WEIGHT',
                 valid_from=df.index[0],
                 asset=asset,
@@ -33,7 +33,7 @@ class TestTickOrderExecution(TestCase):
 
         for asset, weight in [('aapl', 0.7), ('msft', 0.3)]:
             OrderFactory.create(
-                strategy=s,
+                epoch=e,
                 order_type='TARGET_WEIGHT',
                 valid_from=df.index[1],
                 asset=asset,
@@ -42,7 +42,7 @@ class TestTickOrderExecution(TestCase):
             )
 
         OrderFactory.create(
-            strategy=s,
+            epoch=e,
             order_type='TARGET_WEIGHT',
             valid_from=df.index[2],
             asset='aapl',
@@ -54,11 +54,11 @@ class TestTickOrderExecution(TestCase):
 
         # place orders here
         # change target weights OrderFactory.create(strategy=s, order_type='TARGET_WEIGHT', valid_from=df.index[1], target_weights={''})
-        PandasReplayTicker(df).start(s.pk)
-        print(models.Portfolio(s).positions)
+        PandasReplayTicker(df).start(e.pk)
+        print(models.Portfolio(e).positions)
         print(models.Position.objects.all())
 
-        timeseries = models.Portfolio(s).position_history()
+        timeseries = models.Portfolio(e).position_history()
         weights = timeseries["weight"]
         print(weights)
 
@@ -86,18 +86,18 @@ class TestTickOrderExecution(TestCase):
         @receiver(trade_executed)
         def trade_execution(sender, signal, trades, **kwargs):
             t = trades[0]
-            models.Position.objects.filter(strategy=t.strategy, asset=t.asset, asset_strategy=t.asset_strategy).first()
+            models.Position.objects.filter(epoch=t.epoch, asset=t.asset, asset_strategy=t.asset_strategy).first()
             self.assertEqual(t.quantity, expected_quantity)
 
             print(sender, trades)
 
-        s = StrategyFactory.create()
-        print(s.name, order_type)
-        PositionFactory.create(strategy=s, tstamp=df.index[0], asset='aapl', quantity=10)
+        e = EpochFactory.create()
+        print(e.strategy.name, order_type)
+        PositionFactory.create(epoch=e, tstamp=df.index[0], asset='aapl', quantity=10)
 
         # place orders here
-        OrderFactory.create(strategy=s, asset='aapl', order_type=order_type, valid_from=df.index[1], valid_until=df.index[-2], quantity=quantity)
-        PandasReplayTicker(df).start(s.pk)
+        OrderFactory.create(epoch=e, asset='aapl', order_type=order_type, valid_from=df.index[1], valid_until=df.index[-2], quantity=quantity)
+        PandasReplayTicker(df).start(e.pk)
 
 #    def test_order_limits(self):
 #        df = SAMPLE_DATA.tail()

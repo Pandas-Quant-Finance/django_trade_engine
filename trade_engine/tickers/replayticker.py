@@ -34,7 +34,7 @@ class PandasReplayTicker(BaseTicker):
     def send_tick(self, *ticks: Tick):
         tick.send(sender=self.__class__, ticks=ticks)
 
-    def start(self, strategy_id: str, callback: Callable[[List[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] = None):
+    def start(self, epoch_id: int, callback: Callable[[List[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] = None):
         for date in self.index:
             if isinstance(date, pd.Timestamp):
                 date = date.to_pydatetime()
@@ -44,7 +44,7 @@ class PandasReplayTicker(BaseTicker):
             for p in self.prices:
                 ticks = [
                     Tick(
-                        strategy_id,
+                        epoch_id,
                         a,
                         pytz.utc.localize(date) if date.tzinfo is None else date,
                         self.df.loc[date, (a, p[0])],

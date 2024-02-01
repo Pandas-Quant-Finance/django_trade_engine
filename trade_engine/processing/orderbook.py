@@ -51,17 +51,17 @@ def update_ticks(ticks: Iterable[Tick]):
     for t in ticks:
         # make sure we don't remember special limit triggering ticks
         if t.bid <= t.ask:
-            LATEST_TICKS[t.strategy_id][t.asset] = t
+            LATEST_TICKS[t.epoch_id][t.asset] = t
 
 
 def fetch_orders(ticks: Iterable[Tick]) -> Dict[str, Dict[str, Set[models.Order]]]:
     orders = defaultdict(lambda: defaultdict(set))
 
     for t in ticks:
-        main_query = Q(valid_until__gte=t.tst, strategy__pk=t.strategy_id, executed=False, cancelled=False, valid_from__lt=t.tst)
+        main_query = Q(valid_until__gte=t.tst, epoch__pk=t.epoch_id, executed=False, cancelled=False, valid_from__lt=t.tst)
         subquery = Exists(models.Order.objects.filter(main_query, asset=t.asset, target_weight_bracket_id=OuterRef('target_weight_bracket_id')))
         for o in models.Order.objects.filter(main_query, subquery).all():
-            orders[o.strategy_id][o.target_weight_bracket_id].add(o)
+            orders[o.epoch_id][o.target_weight_bracket_id].add(o)
 
     return orders
 
@@ -81,20 +81,20 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
 
     def get_postion_for_order(order) -> models.Position:
         return (
-            [p for p in models.Position.fetch_most_recent_positions(strategy=order.strategy, asset=order.asset, include_zero=True) if p.asset_strategy == order.asset_strategy]
+            [p for p in models.Position.fetch_most_recent_positions(epoch=order.epoch_id, asset=order.asset, include_zero=True) if p.asset_strategy == order.asset_strategy]
             or
             [None]
         )[0]
 
     if order.order_type == 'CLOSE':
         pos = get_postion_for_order(order)
-        yield (0 if pos is None else -pos.quantity), LATEST_TICKS[order.strategy.pk][order.asset], order
+        yield (0 if pos is None else -pos.quantity), LATEST_TICKS[order.epoch_id][order.asset], order
     elif order.order_type == 'TARGET_QUANTITY':
         pos = get_postion_for_order(order)
-        yield (0 if pos is None else (order.quantity - pos.quantity)), LATEST_TICKS[order.strategy.pk][order.asset], order
+        yield (0 if pos is None else (order.quantity - pos.quantity)), LATEST_TICKS[order.epoch_id][order.asset], order
     elif order.order_type == 'PERCENT':
-        cash = models.Position.objects.filter(strategy=order.strategy, asset=models.CASH_ASSET).first()
-        latest_tick = LATEST_TICKS[order.strategy.pk][order.asset]
+        cash = models.Position.objects.filter(epoch=order.epoch_id, asset=models.CASH_ASSET).first()
+        latest_tick = LATEST_TICKS[order.epoch_id][order.asset]
 
         if order.quantity < 0 and (pos := get_postion_for_order(order)) is not None:
             # if percent is < 0 and we have a position, we want to decrease the position
@@ -104,7 +104,7 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
 
         yield (0 if cash.value < 0 or quantity < MIN_TRADE_SIZE else quantity), latest_tick, order
     elif order.order_type == 'INCREASE_PERCENT':
-        latest_tick = LATEST_TICKS[order.strategy.pk][order.asset]
+        latest_tick = LATEST_TICKS[order.epoch_id][order.asset]
         pos = get_postion_for_order(order)
         quantity = ((1 + order.quantity) * pos.value) / (latest_tick.ask if order.quantity > 0 else latest_tick.bid)
         yield quantity, latest_tick, order
@@ -113,20 +113,20 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
         target_weight_orders = {o.asset: o for o in [order, *bracket_orders]}
 
         # get the portfolio
-        portfolio_value, positions = models.Portfolio(order.strategy).positions
+        portfolio_value, positions = models.Portfolio(order.epoch).positions
         positions = {a: p for a, p in positions.items() if p.asset_strategy == order.asset_strategy}
 
         # keys in the portfolio but not in the target weighs need to be closed
         for a, pos in positions.items():
             if a not in target_weight_orders and a != models.CASH_ASSET:
                 target_weight_orders[a] = models.Order(
-                    strategy=order.strategy, asset=a, asset_strategy=order.asset_strategy, order_type='TARGET_WEIGHT',
+                    epoch=order.epoch, asset=a, asset_strategy=order.asset_strategy, order_type='TARGET_WEIGHT',
                     valid_from=order.valid_from, valid_until=order.valid_from, quantity=0, generated=True,
                 )
 
         # calculate quantities
         for a, o in target_weight_orders.items():
-            tick = LATEST_TICKS[order.strategy_id].get(a, None)
+            tick = LATEST_TICKS[order.epoch_id].get(a, None)
             if tick is None:
                 log.warning(f"No price available for: {a}, skip order: {order}")
                 continue
@@ -139,7 +139,7 @@ def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order)
 
             yield qty, tick, target_weight_orders[a]
     else:
-        yield order.quantity, LATEST_TICKS[order.strategy.pk][order.asset], order
+        yield order.quantity, LATEST_TICKS[order.epoch_id][order.asset], order
 
 
 def check_limits(orders: Iterable[Tuple[float, Tick, Order]]) -> List[Tuple[float, float, Tick, Order]]:
@@ -149,7 +149,7 @@ def check_limits(orders: Iterable[Tuple[float, Tick, Order]]) -> List[Tuple[floa
 
 
 def make_trades(orders: Iterable[Tuple[float, float, Tick, Order]]) -> List[Tuple[models.Trade, models.Order]]:
-    return [(models.Trade(strategy=o.strategy, tstamp=t.tst, asset=t.asset, quantity=q, price=p, asset_strategy=o.asset_strategy, order=o), o) for q, p, t, o in orders]
+    return [(models.Trade(epoch=o.epoch, tstamp=t.tst, asset=t.asset, quantity=q, price=p, asset_strategy=o.asset_strategy, order=o), o) for q, p, t, o in orders]
 
 
 def filter_minium_trade_volume(trades: List[Tuple[models.Trade, models.Order]]) -> Tuple[List[models.Trade], List[models.Order]]:

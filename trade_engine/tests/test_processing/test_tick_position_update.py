@@ -16,7 +16,7 @@ class TestTickPosition(TestCase):
             print(sender, ticks)
 
         pos = PositionFactory.create(tstamp=SAMPLE_DATA.index[0], asset='aapl')
-        PandasReplayTicker(SAMPLE_DATA.tail()).start(pos.strategy.pk)
+        PandasReplayTicker(SAMPLE_DATA.tail()).start(pos.epoch.pk)
         print(list(Position.objects.all()))
 
         self.assertEqual(len(list(Position.objects.all())), 5 + 1 + 1)

@@ -15,7 +15,7 @@ class StreamingOrdersStrategy(StrategyBase):
     def __init__(self):
         super().__init__()
 
-    def on_end_of_bar_event_handler(self) -> Callable[[models.Strategy, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
+    def on_end_of_bar_event_handler(self) -> Callable[[models.Epoch, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
         return self._on_end_of_bar
 
     @transaction.atomic()

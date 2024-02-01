@@ -15,47 +15,53 @@ from trade_engine import models
 
 class StrategyBase(object):
 
-    def __init__(self, strategy_name: str):
+    def __init__(self, strategy_name: str, epochs: int = 1):
         self.strategy_name = strategy_name
-        self.strategy = models.Strategy(name=strategy_name)
-        self.strategy.save()
-        self.strategy_id = self.strategy.pk
+        self.epochs = epochs
+        self.strategy = None
 
     def run(self, ticker: BaseTicker):
         # NOTE in case of a "realtime streaming" ticker, this method might never return!
 
-        # TODO we should create the strategy here, we might introduce versioning here and an option to delete
-        #  an eventually already existing strategy
+        # initialize strategy: we might introduce versioning here and an option to delete an eventually already
+        # existing strategy
+        self.strategy = models.Strategy(name=self.strategy_name)
+        self.strategy.save()
 
-        # init
-        self.on_init(self.strategy)
+        # we introduce a new "Epoch" object where we loop trough
+        for e in range(self.epochs):
+            # create a new default epoch
+            epoch = models.Epoch(strategy=self.strategy, epoch=e)
+            epoch.save()
 
-        # TODO we introduce a new "Epoch" object where we loop trough
+            if e <= 0:
+                # init
+                self.on_init(epoch)
 
-        # start backtest ticker
-        if handler := self.on_end_of_bar_event_handler():
-            ticker.start(self.strategy_id, partial(handler, self.strategy))
-        else:
-            ticker.start(self.strategy_id)
+            # start backtest ticker
+            if handler := self.on_end_of_bar_event_handler():
+                ticker.start(epoch.pk, partial(handler, self.strategy))
+            else:
+                ticker.start(epoch.pk)
 
-        # end run
-        self.on_epoch_end()
+            # end run
+            self.on_epoch_end()
 
     @transaction.atomic()
-    def on_init(self, strategy: models.Strategy):
+    def on_init(self, epoch: models.Epoch):
         pass
 
     @abstractmethod
-    def on_end_of_bar_event_handler(self) -> Callable[[models.Strategy, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
+    def on_end_of_bar_event_handler(self) -> Callable[[models.Epoch, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
         pass
 
     def on_epoch_end(self):
         pass
 
     @staticmethod
-    def place_order(strategy: models.Strategy, valid_from: datetime, order: Order):
+    def place_order(epoch: models.Epoch, valid_from: datetime, order: Order):
         models.Order(**{
-            "strategy": strategy,
+            "epoch": epoch,
             "valid_from": valid_from,
             **order.to_dict()
         }).save()

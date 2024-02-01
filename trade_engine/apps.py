@@ -27,14 +27,13 @@ def update_positions_after_tick(sender, signal, ticks: List[Tick], **kwargs):
 def process_order_book(sender,  signal, ticks: List[Tick], **kwargs):
     from .processing.orderbook import new_orderbook
 
-    #lala_orderbook(*ticks)
     new_orderbook(*ticks)
 
 
 @receiver(trade_executed)
 def update_portfolio_after_trade(sender, signal, trades: List['trade_engine.models'], **kwargs):
     from .processing.portfolio import position_update
+    from .processing.trades import save_trades
 
-    # TODO store trades here later
-
+    save_trades(*trades, silent=True)
     position_update(*trades)

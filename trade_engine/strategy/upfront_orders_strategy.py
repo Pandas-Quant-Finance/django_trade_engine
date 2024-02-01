@@ -17,13 +17,13 @@ class UpfrontOrdersStrategy(StrategyBase):
             strategy_name: str,
             orders: "pd.Series[Order]",
     ):
-        super().__init__(strategy_name)
+        super().__init__(strategy_name, epochs=1)
         self.orders = orders[~pd.isnull(orders)]
+
+    def on_init(self, epoch: models.Epoch):
         # place all orders upfont
-
-    def on_init(self, strategy: models.Strategy):
         for idx, order in self.orders.items():
-            StrategyBase.place_order(strategy, idx, order)
+            StrategyBase.place_order(epoch, idx, order)
 
-    def on_end_of_bar_event_handler(self) -> Callable[[models.Strategy, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
+    def on_end_of_bar_event_handler(self) -> Callable[[models.Epoch, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
         return None

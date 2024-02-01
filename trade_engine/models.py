@@ -22,19 +22,8 @@ class Strategy(models.Model):
     train_until = models.DateTimeField(default=DEFAULT_MAX_DATE)
     hyper_parameters = models.JSONField(null=True, blank=True)
 
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        super().save(*args, **kwargs)
-
-        if is_new:
-            Position.objects.create(
-                strategy=self,
-                tstamp=DEFAULT_MIN_DATE,
-                asset=CASH_ASSET,
-                asset_strategy='cash',
-                quantity=self.start_capital,
-                last_price=1
-            )
+    def last_epoch(self) -> 'Epoch':
+        return (list(self.epochs.all().order_by("epoch")) or [None])[-1]
 
     def __str__(self):
         return f'{model_to_dict(self)}'
@@ -47,13 +36,27 @@ class Strategy(models.Model):
 
 class Epoch(models.Model):
 
-    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
+    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE, related_name='epochs')
     epoch = models.IntegerField(default=0)
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new:
+            Position.objects.create(
+                epoch=self,
+                tstamp=DEFAULT_MIN_DATE,
+                asset=CASH_ASSET,
+                asset_strategy='cash',
+                quantity=self.strategy.start_capital,
+                last_price=1
+            )
 
 
 class Position(models.Model):
 
-    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
+    epoch = models.ForeignKey(Epoch, on_delete=models.CASCADE)
     tstamp = models.DateTimeField()
     asset = models.CharField(max_length=64)
     asset_strategy = models.CharField(max_length=64, default=DEFAULT_ASSET_STRATEGY)
@@ -71,22 +74,22 @@ class Position(models.Model):
         return f'{model_to_dict(self)}'
 
     @staticmethod
-    def fetch_most_recent_cash(strategy: Strategy | Iterable = None):
-        positions = Position.fetch_most_recent_positions(strategy, asset=CASH_ASSET, include_zero=True)
+    def fetch_most_recent_cash(epoch: Epoch | Iterable[Epoch] = None):
+        positions = Position.fetch_most_recent_positions(epoch, asset=CASH_ASSET, include_zero=True)
         assert len(positions) == 1, f"Something happened, expected one position got {len(positions)}\n{positions}"
         return positions[0]
 
     @staticmethod
-    def fetch_most_recent_positions(strategy: Strategy | Iterable = None, asset: str = None, include_zero: bool = False):
-        if strategy is not None:
-            if not isinstance(strategy, Iterable): strategy = [strategy]
-            strategy = [str(s.pk if isinstance(s, Strategy) else s) for s in strategy]
+    def fetch_most_recent_positions(epoch: Epoch | Iterable[Epoch] = None, asset: str = None, include_zero: bool = False):
+        if epoch is not None:
+            if not isinstance(epoch, Iterable): epoch = [epoch]
+            epoch = [str(e.pk if isinstance(e, Epoch) else e) for e in epoch]
 
         def get_filter(ns=''):
             filter = f""
 
-            if strategy is not None:
-                filter += f" and {ns}strategy_id in ({','.join(strategy)})"
+            if epoch is not None:
+                filter += f" and {ns}epoch_id in ({','.join(epoch)})"
             if asset is not None:
                 filter += f" and {ns}asset = '{asset}'"
 
@@ -94,13 +97,13 @@ class Position(models.Model):
 
         sql = f"""
             WITH recent as (
-                select strategy_id, asset, asset_strategy, max(tstamp) as tstamp
+                select epoch_id, asset, asset_strategy, max(tstamp) as tstamp
                   from trade_engine_position
                  where 1 = 1 {get_filter()}
-                 group by strategy_id, asset_strategy, asset
+                 group by epoch_id, asset_strategy, asset
             ) select pos.*
                 from trade_engine_position pos
-                join recent on recent.strategy_id = pos.strategy_id
+                join recent on recent.epoch_id = pos.epoch_id
                            and recent.asset = pos.asset
                            and recent.asset_strategy = pos.asset_strategy
                            and recent.tstamp = pos.tstamp
@@ -112,12 +115,12 @@ class Position(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['strategy', 'asset', 'asset_strategy', 'tstamp'], name='unique_asset_position'),
+            models.UniqueConstraint(fields=['epoch', 'asset', 'asset_strategy', 'tstamp'], name='unique_asset_position'),
         ]
         indexes = [
             # models.Index(fields=['strategy', 'asset', 'asset_strategy', 'tstamp']),  # is already a constraint
-            models.Index(fields=['strategy', 'asset', 'tstamp']),
-            models.Index(fields=['strategy', 'asset']),
+            models.Index(fields=['epoch', 'asset', 'tstamp']),
+            models.Index(fields=['epoch', 'asset']),
         ]
 
 
@@ -133,7 +136,7 @@ class Order(models.Model):
         ('TARGET_WEIGHT', 'TARGET_WEIGHT'),
     ]
 
-    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
+    epoch = models.ForeignKey(Epoch, on_delete=models.CASCADE)
     asset = models.CharField(max_length=64, null=True, blank=True)
     asset_strategy = models.CharField(max_length=64, default=DEFAULT_ASSET_STRATEGY)
     order_type = models.CharField(max_length=20, choices=ORDER_TYPES)
@@ -159,7 +162,7 @@ class Order(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=['strategy', 'asset', 'valid_from']),
+            models.Index(fields=['epoch', 'asset', 'valid_from']),
             models.Index(fields=['target_weight_bracket_id']),
             models.Index(fields=['executed']),
             models.Index(fields=['cancelled']),
@@ -168,7 +171,7 @@ class Order(models.Model):
 
 class Trade(models.Model):
 
-    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
+    epoch = models.ForeignKey(Epoch, on_delete=models.CASCADE)
     tstamp = models.DateTimeField()
     asset = models.CharField(max_length=64)
     quantity = models.FloatField()
@@ -182,12 +185,17 @@ class Trade(models.Model):
 
 class Portfolio(object):
 
-    def __init__(self, strategy: Strategy|int):
-        self.strategy = strategy.pk if isinstance(strategy, Strategy) else strategy
+    def __init__(self, reference: Strategy | Epoch | int):
+        if isinstance(reference, int):
+            self.epoch = reference
+        elif isinstance(reference, Strategy):
+            self.epoch = reference.last_epoch()
+        elif isinstance(reference, Epoch):
+            self.epoch = reference.pk
 
     @property
     def positions(self) -> Tuple[float, Dict[str, List[Position]]]:
-        positions = list(Position.fetch_most_recent_positions(strategy=self.strategy))
+        positions = list(Position.fetch_most_recent_positions(epoch=self.epoch))
 
         # We need to sum short positions as positive value because the portfolio weights can only sum to exactly 1
         portfolio_value = sum(abs(p.value) for p in positions)
@@ -203,8 +211,8 @@ class Portfolio(object):
         queries = []
         positions = pd.DataFrame(
             model_to_dict(p) for p in Position.objects\
-                .filter(*queries, strategy=self.strategy, tstamp__gte=from_index)\
-                .order_by("strategy", "asset", "asset_strategy", "tstamp")\
+                .filter(*queries, epoch=self.epoch, tstamp__gte=from_index)\
+                .order_by("epoch", "asset", "asset_strategy", "tstamp")\
                 .all()
         )
 

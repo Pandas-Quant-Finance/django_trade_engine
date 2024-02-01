@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from django.dispatch import receiver
 from django.test import TestCase, SimpleTestCase
@@ -40,6 +41,14 @@ class TestUpfrontOrderStrategy(SimpleTestCase):
 
         # backtest strategy
         strategy.run(PandasReplayTicker({"aapl": df}))
-        print(models.Portfolio(strategy.strategy).position_history())
+        timeseries = models.Portfolio(strategy.strategy).position_history()
+        print(timeseries.columns)
+        print(timeseries)
+        self.assertAlmostEquals(
+            np.sum(timeseries[("portfolio", "value")].tail(1).values / timeseries[("portfolio", "value")].head(1).values),
+            1.1751,
+            4
+        )
+
 
 
