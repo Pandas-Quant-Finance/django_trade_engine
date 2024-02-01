@@ -165,6 +165,9 @@ class Trade(models.Model):
     asset_strategy = models.CharField(max_length=64, default=DEFAULT_ASSET_STRATEGY)
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
 
+    def __str__(self):
+        return f'{model_to_dict(self)}'
+
 
 class Portfolio(object):
 
