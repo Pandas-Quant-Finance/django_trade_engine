@@ -39,6 +39,7 @@ class Strategy(models.Model):
     def __str__(self):
         return f'{model_to_dict(self)}'
 
+
 class Position(models.Model):
 
     strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
@@ -139,27 +140,27 @@ class Order(models.Model):
     class Meta:
         constraints = [
             CheckConstraint(
-                check=models.Q(order_type__in=('TARGET_WEIGHT', 'CLOSE')) | ~models.Q(quantity=None),
+                check=models.Q(order_type__in=('CLOSE', )) | ~models.Q(quantity=None),
                 name='check_quantity'
             ),
         ]
+        indexes = [
+            models.Index(fields=['strategy', 'asset', 'valid_from']),
+            models.Index(fields=['target_weight_bracket_id']),
+            models.Index(fields=['executed']),
+            models.Index(fields=['cancelled']),
+        ]
 
 
-@dataclass
-class Trade:
+class Trade(models.Model):
 
-    # TODO we eventually convert Trade into a model and save it to the database
-    #  this is because we later want to be able to switch the orderbook incl trade exectution to a orderbook where we
-    #  place the trade as a order at a real broker. then we get a trade execution (one signal more in the chain) from the
-    #  broker. we skip this for the moment as we only use it for backtesting right now
-
-    strategy: Strategy  # = models.ForeignKey(Strategy, on_delete=models.CASCADE)
-    tstamp: datetime
-    asset: str
-    quantity: float
-    price: float
-    asset_strategy: str = DEFAULT_ASSET_STRATEGY
-    order: int = None
+    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE)
+    tstamp = models.DateTimeField()
+    asset = models.CharField(max_length=64)
+    quantity = models.FloatField()
+    price = models.FloatField()
+    asset_strategy = models.CharField(max_length=64, default=DEFAULT_ASSET_STRATEGY)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
 
 
 class Portfolio(object):

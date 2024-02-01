@@ -79,7 +79,7 @@ def get_orders_with_quantity(orders: Dict[str, Dict[str, Set[models.Order]]]) ->
 def _get_order_with_quantity(order: models.Order, *bracket_orders: models.Order) -> Tuple[float, float, models.Order] | List[Tuple[float, Tick, models.Order]]:
     # TODO we need the most recent tick for each asset which is not a high/low tick and return (quantity, price, order)
 
-    def get_postion_for_order(order):
+    def get_postion_for_order(order) -> models.Position:
         return (
             [p for p in models.Position.fetch_most_recent_positions(strategy=order.strategy, asset=order.asset, include_zero=True) if p.asset_strategy == order.asset_strategy]
             or
@@ -149,7 +149,7 @@ def check_limits(orders: Iterable[Tuple[float, Tick, Order]]) -> List[Tuple[floa
 
 
 def make_trades(orders: Iterable[Tuple[float, float, Tick, Order]]) -> List[Tuple[models.Trade, models.Order]]:
-    return [(models.Trade(o.strategy, t.tst, o.asset, q, p, order=o.pk), o) for q, p, t, o in orders]
+    return [(models.Trade(strategy=o.strategy, tstamp=t.tst, asset=t.asset, quantity=q, price=p, asset_strategy=o.asset_strategy, order=o), o) for q, p, t, o in orders]
 
 
 def filter_minium_trade_volume(trades: List[Tuple[models.Trade, models.Order]]) -> Tuple[List[models.Trade], List[models.Order]]:
