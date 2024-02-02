@@ -5,7 +5,7 @@ from datetime import datetime
 @dataclass
 class Tick:
 
-    epoch_id: str
+    epoch_id: int
     asset: str
     tst: datetime
     bid: float = None

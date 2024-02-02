@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Tuple, Dict, Callable
 
 import pandas as pd
@@ -34,7 +35,7 @@ class PandasReplayTicker(BaseTicker):
     def send_tick(self, *ticks: Tick):
         tick.send(sender=self.__class__, ticks=ticks)
 
-    def start(self, epoch_id: int, callback: Callable[[List[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] = None):
+    def start(self, epoch_id: int, callback: Callable[[List[Tick], datetime], None] = None):
         for date in self.index:
             if isinstance(date, pd.Timestamp):
                 date = date.to_pydatetime()
@@ -56,4 +57,4 @@ class PandasReplayTicker(BaseTicker):
                 self.send_tick(*ticks)
 
             if callable(callback):
-                callback(ticks, self.df.loc[:date])
+                callback(ticks, date)

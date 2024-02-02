@@ -39,8 +39,11 @@ class StrategyBase(object):
                 self.on_init(epoch)
 
             # start backtest ticker
-            if handler := self.on_end_of_bar_event_handler():
-                ticker.start(epoch.pk, partial(handler, self.strategy))
+            if hasattr(self, "_on_end_of_bar"):
+                ticker.start(
+                    epoch.pk,
+                    partial(self._on_end_of_bar, self.strategy, epoch, self.strategy.train_until)
+                )
             else:
                 ticker.start(epoch.pk)
 
@@ -49,10 +52,6 @@ class StrategyBase(object):
 
     @transaction.atomic()
     def on_init(self, epoch: models.Epoch):
-        pass
-
-    @abstractmethod
-    def on_end_of_bar_event_handler(self) -> Callable[[models.Epoch, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
         pass
 
     def on_epoch_end(self):

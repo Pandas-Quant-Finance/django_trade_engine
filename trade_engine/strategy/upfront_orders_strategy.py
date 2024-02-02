@@ -24,6 +24,3 @@ class UpfrontOrdersStrategy(StrategyBase):
         # place all orders upfont
         for idx, order in self.orders.items():
             StrategyBase.place_order(epoch, idx, order)
-
-    def on_end_of_bar_event_handler(self) -> Callable[[models.Epoch, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], None] | None:
-        return None
