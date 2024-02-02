@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from trade_engine import models
 from trade_engine.strategy.order import Order
@@ -13,10 +13,10 @@ from trade_engine.tickers.replayticker import PandasReplayTicker
 df = SAMPLE_DATA["aapl"]
 
 
-# TODO reimplement the same test where we pass the rolling means as features into a streaming strategy
 # TODO 2 implement a test using a pytorch model and train/test data and hyper parameters
 
-class TestStreamingOrderStrategy(SimpleTestCase):
+#class TestStreamingOrderStrategy(SimpleTestCase):
+class TestStreamingOrderStrategy(TestCase):
     databases = ["default"]
 
     def test_sma_strategy(self):
@@ -41,6 +41,7 @@ class TestStreamingOrderStrategy(SimpleTestCase):
             strategy=strategy,
             strategy_name='test_streaming_order_strategy',
             features=pd.concat([buy, sell], axis=1),
+            epochs=2,
         )
 
         # backtest strategy
@@ -54,7 +55,7 @@ class TestStreamingOrderStrategy(SimpleTestCase):
             4
         )
 
-        #self.assertEqual(models.Order.objects.count(), 13 * 2)  # later we test 2 epochs
+        self.assertEqual(models.Order.objects.count(), 13 * 2)  # later we test 2 epochs
 
 
 

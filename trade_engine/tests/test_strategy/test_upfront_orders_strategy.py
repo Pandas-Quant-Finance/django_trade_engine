@@ -1,5 +1,5 @@
 import numpy as np
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from trade_engine import models
 from trade_engine.strategy.order import Order
@@ -10,7 +10,8 @@ from trade_engine.tickers.replayticker import PandasReplayTicker
 df = SAMPLE_DATA["aapl"]
 
 
-class TestUpfrontOrderStrategy(SimpleTestCase):
+#class TestUpfrontOrderStrategy(SimpleTestCase):
+class TestUpfrontOrderStrategy(TestCase):
     databases = ["default"]
 
     def test_sma_strategy(self):
