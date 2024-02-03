@@ -208,6 +208,10 @@ class Portfolio(object):
         }
 
     def position_history(self, from_index: datetime = DEFAULT_MIN_DATE):
+        if from_index > DEFAULT_MIN_DATE:
+            # TODO beim Portfolio per Stichtag brauchen wir noch die letzte Position vor dem Stichtag
+            pass
+
         queries = []
         positions = pd.DataFrame(
             model_to_dict(p) for p in Position.objects\

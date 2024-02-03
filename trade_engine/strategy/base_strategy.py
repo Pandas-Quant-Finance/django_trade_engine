@@ -1,16 +1,11 @@
-from abc import abstractmethod
 from datetime import datetime
 from functools import partial
-from pyexpat import model
-from typing import List, Iterable, Callable
 
-import pandas as pd
 from django.db import transaction
 
+from trade_engine import models
 from trade_engine.strategy.order import Order
 from trade_engine.tickers.baseticker import BaseTicker
-from trade_engine.tickers.tick import Tick
-from trade_engine import models
 
 
 class StrategyBase(object):
@@ -20,12 +15,12 @@ class StrategyBase(object):
         self.epochs = epochs
         self.strategy = None
 
-    def run(self, ticker: BaseTicker):
+    def run(self, ticker: BaseTicker, **strategy_kwargs):
         # NOTE in case of a "realtime streaming" ticker, this method might never return!
 
         # initialize strategy: we might introduce versioning here and an option to delete an eventually already
         # existing strategy
-        self.strategy = models.Strategy(name=self.strategy_name)
+        self.strategy = models.Strategy(name=self.strategy_name, **strategy_kwargs)
         self.strategy.save()
 
         # we introduce a new "Epoch" object where we loop trough

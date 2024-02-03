@@ -18,3 +18,6 @@ keep a database after a test completed:
  * inherit from django.test.SimpleTestCase
  * in settings.py define test db file path: `DATABASES.default.TEST`
  * use --keepdb flag: `./manage.py test trade_engine.tests.test_strategy.test_upfront_orders_strategy.TestUpfrontOrderStrategy.test_sma_strategy --keepdb`
+
+profiling of performance issues:
+ * https://github.com/jazzband/django-silk

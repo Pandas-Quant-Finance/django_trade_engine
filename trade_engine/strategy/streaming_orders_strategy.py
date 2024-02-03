@@ -1,5 +1,4 @@
 from datetime import datetime
-from datetime import datetime
 from typing import Iterable, Callable
 
 import pandas as pd
@@ -15,7 +14,7 @@ class StreamingOrdersStrategy(StrategyBase):
 
     def __init__(
             self,
-            strategy: Callable[[bool, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], Iterable[Order] | Order | None],
+            strategy: Callable[[int, bool, Iterable[Tick], pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None], Iterable[Order] | Order | None],
             strategy_name: str,
             features: pd.DataFrame,
             labels: pd.DataFrame = None,
@@ -41,8 +40,8 @@ class StreamingOrdersStrategy(StrategyBase):
         features = self.features.loc[:date]
         labels = self.labels.loc[:date] if self.labels is not None else None
         weights = self.weights.loc[:date] if self.weights is not None else None
-        is_training_data = features.index[-1] <= train_until.replace(tzinfo=features.index[-1].tzinfo)
-        orders = self.on_bar_end(is_training_data, ticks, features, labels, weights)
+        is_training_data = len(features) and features.index[-1] <= train_until.replace(tzinfo=features.index[-1].tzinfo)
+        orders = self.on_bar_end(epoch.epoch, is_training_data, ticks, features, labels, weights)
 
         # place orders
         if orders is not None:
@@ -51,6 +50,7 @@ class StreamingOrdersStrategy(StrategyBase):
                 StrategyBase.place_order(epoch, tst, order)
     def on_bar_end(
             self,
+            epoch: int,
             is_training_data: bool,
             ticks: Iterable[Tick],
             features: pd.DataFrame,
@@ -63,7 +63,7 @@ class StreamingOrdersStrategy(StrategyBase):
         # TODO we should also send the current orders in case you want to cancel them
         # TODO we should also send a lazy current portfolio
 
-        orders = self.strategy_order_generator(is_training_data, ticks, features, labels, weights)
+        orders = self.strategy_order_generator(epoch, is_training_data, ticks, features, labels, weights)
         if orders is None:
             return None
         elif isinstance(orders, Iterable):

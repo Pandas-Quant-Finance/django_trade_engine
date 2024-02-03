@@ -27,7 +27,7 @@ class TestStreamingOrderStrategy(TestCase):
         buy = ((signal) & (~signal).shift(1)).rename("buy")
         sell = ((~signal) & (signal).shift(1)).rename("sell")
 
-        def strategy(bool, ticks, features, *args):
+        def strategy(epoch, bool, ticks, features, *args):
             # create orders from signals
             if features["buy"].iloc[-1]:
                 return Order(asset='aapl', order_type='PERCENT', quantity=1.0)
