@@ -44,13 +44,13 @@ class StrategyBase(object):
                 ticker.start(epoch.pk)
 
             # end run
-            self.on_epoch_end()
+            self.on_epoch_end(e)
 
     @transaction.atomic()
     def on_init(self, epoch: models.Epoch):
         pass
 
-    def on_epoch_end(self):
+    def on_epoch_end(self, epoch: int):
         pass
 
     @staticmethod

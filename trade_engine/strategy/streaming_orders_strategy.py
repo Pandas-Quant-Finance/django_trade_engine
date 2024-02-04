@@ -45,6 +45,7 @@ class StreamingOrdersStrategy(StrategyBase):
 
         # place orders
         if orders is not None:
+            if not isinstance(orders, Iterable): orders = [orders]
             tst = max([t.tst for t in ticks])
             for order in orders:
                 StrategyBase.place_order(epoch, tst, order)

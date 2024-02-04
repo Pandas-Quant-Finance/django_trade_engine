@@ -25,6 +25,9 @@ class TestStreamingOrderStrategy(TestCase):
         import torch
         from torch import nn
 
+        # reproducible
+        torch.manual_seed(0)
+
         # calculate signals
         fast = df["Close"].rolling(20).mean()
         slow = df["Close"].rolling(60).mean()
@@ -34,10 +37,14 @@ class TestStreamingOrderStrategy(TestCase):
             def __init__(self):
                 super().__init__()
                 self.nn = nn.Sequential(
-                    nn.Linear(10, 5),
+                    nn.Linear(10, 9),
+                    nn.Tanh(),
+                    nn.Linear(9, 8),
+                    nn.Tanh(),
+                    nn.Linear(8, 5),
                     nn.Tanh(),
                     nn.Linear(5, 1),
-                    nn.Sigmoid(),
+                    nn.Tanh(),
                 )
 
             def forward(self, x):
@@ -49,12 +56,14 @@ class TestStreamingOrderStrategy(TestCase):
             
             def __init__(self):
                 super().__init__()
-                self.loss = torch.nn.MSELoss()
 
             def forward(self, x, labels):
                 # Note that x, labels will always be a pandas dataframes
                 if len(x) < 1: return None
-                return self.loss(x, torch.from_numpy(labels[-1:].astype('float32').values.reshape((1, -1))))
+                return (x * -torch.from_numpy(labels[-1:].astype('float32').values.reshape((1, -1)))).sum(dim=1).mean()
+
+        def make_order(epoch, signal):
+            return Order(asset='aapl', order_type='TARGET_WEIGHT', quantity=signal.item()) if abs(signal.item()) > 0.01 else None
 
         # create strategy
         strategy = PyTorchModelStrategy(
@@ -62,6 +71,8 @@ class TestStreamingOrderStrategy(TestCase):
             model=TestModel(),
             optimizer=torch.optim.Adam,
             loss=MyLoss(),
+            signal_to_order=make_order,
+            #signal_to_order=lambda _, s: print(s.item()),
             features=signal.to_frame(),
             labels=df["Close"].pct_change().shift(-1).to_frame(),
             epochs=2,
@@ -74,11 +85,11 @@ class TestStreamingOrderStrategy(TestCase):
         print(timeseries)
         self.assertAlmostEquals(
             np.sum(timeseries[("portfolio", "value")].tail(1).values / timeseries[("portfolio", "value")].head(1).values),
-            1.5839,
+            1.3359,
             4
         )
 
-        self.assertEqual(models.Order.objects.count(), 13 * 2)  # later we test 2 epochs
+        self.assertEqual(models.Order.objects.count(), 1220)
 
 
 

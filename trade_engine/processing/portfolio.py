@@ -23,7 +23,7 @@ def position_roll_forward(*ticks: Tick):
             pos.tstamp = tick.tst
 
         pos.last_price = tick.bid if pos.quantity > 0 else tick.ask
-        pos.save()
+        pos.save()  # Bulk saving would be nice
 
 
 @transaction.atomic()

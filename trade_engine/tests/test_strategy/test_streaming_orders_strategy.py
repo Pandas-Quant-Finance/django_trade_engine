@@ -55,7 +55,7 @@ class TestStreamingOrderStrategy(TestCase):
             4
         )
 
-        self.assertEqual(models.Order.objects.count(), 13 * 2)  # later we test 2 epochs
+        self.assertEqual(models.Order.objects.count(), 13 * 2)
 
 
 

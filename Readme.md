@@ -7,10 +7,21 @@ whole flow:
  `feed a new price event into the model (stragegy) -> retrieve a signal -> place an order -> get a trade execution -> update the portfolio`  
 
 The only difference between backtesting and having the strategy live is that we don't send the orders to a real broker.
-As a consequence we have to implement the order handling (orderbook) for different use cases and brokers.
+As a consequence we have to implement the order handling (orderbook) for different use cases and brokers. Note that some 
+brokers might not support a specific order type and thus a local copy of the orderbook has to be kept in place.
 
 This also means we have full control over all order during backtesting. We can place orders, cancel orders and use
-limit orders as well as stop limit orders. Theoretically we could implement trailing stops and if done order types as well.  
+limit orders as well as stop limit orders. Theoretically we could implement trailing stops and _if done_ order types as well. 
+Ultimately we could implement volume checks and simulate partial execution. 
+
+On the downside is that this way of backtesting is per definition not as fast as a simple matrix multiplication.
+
+So why and when should you use django trade engine for your backtesting?
+ * when you need full control over orders, place limit orders and be able to cancel orders
+ * when you want to test strategies like market making
+ * when you want to test portfolio construction using target weights in very realistic environment  
+ * when you plan to use a reinforcement machine learning model
+ * when you plan to use django trade engine to move the strategy into production (well we are far away from that atm)
 
 
 #### Debugging
