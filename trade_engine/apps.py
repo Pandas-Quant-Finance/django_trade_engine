@@ -31,7 +31,7 @@ def process_order_book(sender,  signal, ticks: List[Tick], **kwargs):
 
 
 @receiver(trade_executed)
-def update_portfolio_after_trade(sender, signal, trades: List['trade_engine.models'], **kwargs):
+def update_portfolio_after_trade(sender, signal, trades: List['trade_engine.models.Trade'], **kwargs):
     from .processing.portfolio import position_update
     from .processing.trades import save_trades
 

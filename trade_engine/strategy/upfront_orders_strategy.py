@@ -23,4 +23,8 @@ class UpfrontOrdersStrategy(StrategyBase):
     def on_init(self, epoch: models.Epoch):
         # place all orders upfont
         for idx, order in self.orders.items():
-            StrategyBase.place_order(epoch, idx, order)
+            if isinstance(order, Iterable):
+                for o in order:
+                    StrategyBase.place_order(epoch, idx, o)
+            else:
+                StrategyBase.place_order(epoch, idx, order)

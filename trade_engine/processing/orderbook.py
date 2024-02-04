@@ -44,6 +44,7 @@ def new_orderbook(*ticks: Tick, stop_propagation: bool = False):
 
 
 def aggregate_ticks(ticks: Iterable[Tick]) -> Dict[str, Tick]:
+    #{t.tst: t.asset for t in sorted(ticks, key=lambda t: t.tst)}
     return {t.asset: t for t in sorted(ticks, key=lambda t: t.tst)}
 
 
@@ -56,12 +57,18 @@ def update_ticks(ticks: Iterable[Tick]):
 
 def fetch_orders(ticks: Iterable[Tick]) -> Dict[str, Dict[str, Set[models.Order]]]:
     orders = defaultdict(lambda: defaultdict(set))
+    epoch_time_ticks = defaultdict(lambda: defaultdict(set))
 
-    for t in ticks:
-        main_query = Q(valid_until__gte=t.tst, epoch__pk=t.epoch_id, executed=False, cancelled=False, valid_from__lt=t.tst)
-        subquery = Exists(models.Order.objects.filter(main_query, asset=t.asset, target_weight_bracket_id=OuterRef('target_weight_bracket_id')))
-        for o in models.Order.objects.filter(main_query, subquery).all():
-            orders[o.epoch_id][o.target_weight_bracket_id].add(o)
+    # prepare ticks for in query
+    for tick in ticks:
+        epoch_time_ticks[tick.epoch_id][tick.tst].add(tick.asset)
+
+    for epoch_id, time_ticks in epoch_time_ticks.items():
+        for tst, assets in time_ticks.items():
+            main_query = Q(valid_until__gte=tst, epoch__pk=epoch_id, executed=False, cancelled=False, valid_from__lt=tst)
+            subquery = Exists(models.Order.objects.filter(main_query, asset__in=assets, target_weight_bracket_id=OuterRef('target_weight_bracket_id')))
+            for o in models.Order.objects.filter(main_query, subquery).all():
+                orders[o.epoch_id][o.target_weight_bracket_id].add(o)
 
     return orders
 

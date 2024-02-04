@@ -54,8 +54,11 @@ class StrategyBase(object):
 
     @staticmethod
     def place_order(epoch: models.Epoch, valid_from: datetime, order: Order):
-        models.Order(**{
-            "epoch": epoch,
-            "valid_from": valid_from,
-            **order.to_dict()
-        }).save()
+        try:
+            models.Order(**{
+                "epoch": epoch,
+                "valid_from": valid_from,
+                **order.to_dict()
+            }).save()
+        except Exception as e:
+            raise e
