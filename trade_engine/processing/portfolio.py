@@ -10,19 +10,20 @@ log = logging.getLogger(__name__)
 
 @transaction.atomic()
 def position_roll_forward(*ticks: Tick):
-    for tick in ticks:
-        if tick.bid > tick.ask:
-            # undocumented feature to catch limit orders from candle stick data, ignore if bid > ask
-            continue
+    # undocumented feature to catch limit orders from candle stick data, ignore if bid > ask
+    ticks = sorted(filter(lambda t: t.bid <= t.ask, ticks), key=lambda t: t.tst, reverse=True)
+    ticks = {t.asset: t for t in ticks}
 
-        for pos in models.Position.fetch_most_recent_positions(asset=tick.asset):
-            if tick.tst > pos.tstamp:
-                # if we have a newer quote then create a new timeseries entry else update
-                pos.pk = None
-                pos.tstamp = tick.tst
+    for pos in models.Position.fetch_most_recent_positions(asset=ticks.keys()):
+        tick = ticks[pos.asset]
 
-            pos.last_price = tick.bid if pos.quantity > 0 else tick.ask
-            pos.save()
+        if tick.tst > pos.tstamp:
+            # if we have a newer quote then create a new timeseries entry else update
+            pos.pk = None
+            pos.tstamp = tick.tst
+
+        pos.last_price = tick.bid if pos.quantity > 0 else tick.ask
+        pos.save()
 
 
 @transaction.atomic()

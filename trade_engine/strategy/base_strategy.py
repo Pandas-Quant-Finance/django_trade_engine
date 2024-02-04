@@ -1,5 +1,6 @@
 from datetime import datetime
 from functools import partial
+from typing import Iterable
 
 from django.db import transaction
 
@@ -53,12 +54,23 @@ class StrategyBase(object):
         pass
 
     @staticmethod
-    def place_order(epoch: models.Epoch, valid_from: datetime, order: Order):
-        try:
-            models.Order(**{
+    def make_order(epoch: models.Epoch, valid_from: datetime, order: Order):
+        return models.Order(**{
                 "epoch": epoch,
                 "valid_from": valid_from,
                 **order.to_dict()
-            }).save()
+            })
+
+    @staticmethod
+    def place_order(epoch: models.Epoch, valid_from: datetime, order: Order):
+        try:
+            StrategyBase.make_order(epoch, valid_from, order).save()
+        except Exception as e:
+            raise e
+
+    @staticmethod
+    def _bulk_insert_orders(orders: Iterable[Order]):
+        try:
+            models.Order.objects.bulk_create(orders)
         except Exception as e:
             raise e

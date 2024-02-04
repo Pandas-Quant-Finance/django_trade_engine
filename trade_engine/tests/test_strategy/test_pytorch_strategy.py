@@ -21,7 +21,7 @@ df = SAMPLE_DATA["aapl"]
 class TestStreamingOrderStrategy(TestCase):
     databases = ["default"]
 
-    def test_sma_strategy(self):
+    def test_torch_sma_strategy(self):
         import torch
         from torch import nn
 

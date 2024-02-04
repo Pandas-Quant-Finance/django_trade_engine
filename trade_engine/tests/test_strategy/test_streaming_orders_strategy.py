@@ -19,7 +19,7 @@ df = SAMPLE_DATA["aapl"]
 class TestStreamingOrderStrategy(TestCase):
     databases = ["default"]
 
-    def test_sma_strategy(self):
+    def test_streaming_sma_strategy(self):
         # calculate signals
         fast = df["Close"].rolling(20).mean()
         slow = df["Close"].rolling(60).mean()

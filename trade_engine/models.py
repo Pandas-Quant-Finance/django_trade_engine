@@ -80,7 +80,7 @@ class Position(models.Model):
         return positions[0]
 
     @staticmethod
-    def fetch_most_recent_positions(epoch: Epoch | Iterable[Epoch] = None, asset: str = None, include_zero: bool = False):
+    def fetch_most_recent_positions(epoch: Epoch | Iterable[Epoch] = None, asset: str | Iterable[str] = None, include_zero: bool = False):
         if epoch is not None:
             if not isinstance(epoch, Iterable): epoch = [epoch]
             epoch = [str(e.pk if isinstance(e, Epoch) else e) for e in epoch]
@@ -91,7 +91,10 @@ class Position(models.Model):
             if epoch is not None:
                 filter += f" and {ns}epoch_id in ({','.join(epoch)})"
             if asset is not None:
-                filter += f" and {ns}asset = '{asset}'"
+                if not isinstance(asset, str) and isinstance(asset, Iterable):
+                    filter += f""" and {ns}asset in ('{"', '".join(asset)}')"""
+                else:
+                    filter += f" and {ns}asset = '{asset}'"
 
             return filter
 

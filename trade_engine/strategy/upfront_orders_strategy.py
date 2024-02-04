@@ -21,10 +21,12 @@ class UpfrontOrdersStrategy(StrategyBase):
         self.orders = orders[~pd.isnull(orders)]
 
     def on_init(self, epoch: models.Epoch):
-        # place all orders upfont
+        # place all orders upfront
+        orders = []
         for idx, order in self.orders.items():
             if isinstance(order, Iterable):
-                for o in order:
-                    StrategyBase.place_order(epoch, idx, o)
+                orders.extend([StrategyBase.make_order(epoch, idx, o) for o in order])
             else:
-                StrategyBase.place_order(epoch, idx, order)
+                orders.append(StrategyBase.make_order(epoch, idx, order))
+
+        StrategyBase._bulk_insert_orders(orders)
